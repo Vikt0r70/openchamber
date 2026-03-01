@@ -415,7 +415,7 @@ const TurnBlock: React.FC<TurnBlockProps> = ({
                     </div>
                     <div
                         aria-hidden="true"
-                        className="pointer-events-none absolute inset-x-0 top-full z-0 h-8 bg-gradient-to-b from-[var(--surface-background)] to-transparent"
+                        className="pointer-events-none absolute inset-x-0 top-full z-0 h-4 bg-gradient-to-b from-[var(--surface-background)] to-transparent sm:h-8"
                     />
                 </div>
             ) : (

@@ -287,6 +287,7 @@ interface MessageBodyProps {
     onFork?: () => void;
     errorMessage?: string;
     userActionsMode?: 'inline' | 'external-content' | 'external-actions';
+    stickyUserHeaderEnabled?: boolean;
 }
 
 const UserMessageBody: React.FC<{
@@ -302,7 +303,8 @@ const UserMessageBody: React.FC<{
     onRevert?: () => void;
     onFork?: () => void;
     userActionsMode?: 'inline' | 'external-content' | 'external-actions';
-}> = ({ messageId, parts, isMobile, hasTouchInput, hasTextContent, onCopyMessage, copiedMessage, onShowPopup, agentMention, onRevert, onFork, userActionsMode = 'inline' }) => {
+    stickyUserHeaderEnabled?: boolean;
+}> = ({ messageId, parts, isMobile, hasTouchInput, hasTextContent, onCopyMessage, copiedMessage, onShowPopup, agentMention, onRevert, onFork, userActionsMode = 'inline', stickyUserHeaderEnabled = true }) => {
     const [copyHintVisible, setCopyHintVisible] = React.useState(false);
     const copyHintTimeoutRef = React.useRef<number | null>(null);
 
@@ -379,7 +381,11 @@ const UserMessageBody: React.FC<{
         <div className={cn(
             'group/user-actions',
             isMobile
-                ? 'flex items-center justify-end pt-2 pb-3'
+                ? userActionsMode === 'inline'
+                    ? 'flex items-center justify-end pt-2 pb-3'
+                    : stickyUserHeaderEnabled
+                        ? 'flex h-9 items-start justify-end pt-0'
+                        : 'flex h-11 items-start justify-end pt-0'
                 : userActionsMode === 'inline'
                     ? 'absolute top-full left-0 right-0 z-10 pt-5'
                     : 'flex h-8 items-start justify-end pt-2'
@@ -388,7 +394,9 @@ const UserMessageBody: React.FC<{
                 className={cn(
                     'flex items-center justify-end gap-1',
                     isMobile
-                        ? 'translate-x-5'
+                        ? userActionsMode === 'inline'
+                            ? 'translate-x-5'
+                            : 'translate-x-0'
                         : userActionsMode === 'inline'
                             ? 'translate-x-5'
                             : 'translate-x-0',
@@ -1442,6 +1450,7 @@ const MessageBody: React.FC<MessageBodyProps> = ({ isUser, ...props }) => {
                 onRevert={props.onRevert}
                 onFork={props.onFork}
                 userActionsMode={props.userActionsMode}
+                stickyUserHeaderEnabled={props.stickyUserHeaderEnabled}
             />
         );
     }

@@ -165,7 +165,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
     const messageRole = React.useMemo(() => deriveMessageRole(message.info), [message.info]);
     const isUser = messageRole.isUser;
-    const useExternalUserActionsRow = isUser && !isMobile && !stickyUserHeader;
+    const useExternalUserActionsRow = isUser && (isMobile || !stickyUserHeader);
 
     const sessionId = message.info.sessionID;
 
@@ -943,7 +943,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     }
 
     const assistantTopPaddingClass = !isUser && shouldShowHeader
-        ? (stickyUserHeader ? (isMobile ? 'pt-10' : 'pt-6') : 'pt-0')
+        ? (stickyUserHeader ? (isMobile ? 'pt-4' : 'pt-6') : 'pt-0')
         : 'pt-0';
 
     return (
@@ -992,6 +992,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                                             onFork={isUser ? handleFork : undefined}
                                             errorMessage={assistantErrorText}
                                             userActionsMode={useExternalUserActionsRow ? 'external-content' : 'inline'}
+                                            stickyUserHeaderEnabled={stickyUserHeader}
                                         />
                                     </div>
                                     {useExternalUserActionsRow ? (
@@ -1023,6 +1024,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                                             onFork={isUser ? handleFork : undefined}
                                             errorMessage={assistantErrorText}
                                             userActionsMode="external-actions"
+                                            stickyUserHeaderEnabled={stickyUserHeader}
                                         />
                                     ) : null}
                                 </div>
