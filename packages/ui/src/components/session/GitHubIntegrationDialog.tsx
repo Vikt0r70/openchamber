@@ -2,7 +2,6 @@ import * as React from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -291,14 +290,63 @@ export function GitHubIntegrationDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[70vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <RiGithubLine className="h-5 w-5" />
-            Select from GitHub
-          </DialogTitle>
-          <DialogDescription>
-            Choose an issue or pull request to link to your worktree
-          </DialogDescription>
+        <DialogHeader className="flex flex-row items-center justify-between">
+          <div className="flex items-center gap-3">
+            <DialogTitle className="flex items-center gap-2">
+              <RiGithubLine className="h-5 w-5" />
+              Select from GitHub
+            </DialogTitle>
+            
+            {/* Tabs - after title */}
+            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+              <button
+                onClick={() => {
+                  setActiveTab('issues');
+                  setSearchQuery('');
+                }}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1 rounded-md typography-ui-label transition-all',
+                  activeTab === 'issues'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted-foreground/5'
+                )}
+              >
+                <RiGitBranchLine className="h-3.5 w-3.5" />
+                Issues
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('prs');
+                  setSearchQuery('');
+                }}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1 rounded-md typography-ui-label transition-all',
+                  activeTab === 'prs'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted-foreground/5'
+                )}
+              >
+                <RiGitPullRequestLine className="h-3.5 w-3.5" />
+                Pull Requests
+              </button>
+            </div>
+          </div>
+          
+          {/* Selected Item Inline Display */}
+          {(selectedIssue || selectedPr) && (
+            <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50 border border-border/50">
+              <RiCheckLine className="h-3.5 w-3.5 text-status-success shrink-0" />
+              <span className="typography-small truncate max-w-[120px]">
+                {selectedIssue ? `Issue #${selectedIssue.number}` : `PR #${selectedPr?.number}`}
+              </span>
+              <button
+                onClick={handleClear}
+                className="text-muted-foreground hover:text-foreground shrink-0 p-0.5 rounded hover:bg-muted transition-colors"
+              >
+                <RiCloseLine className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
         </DialogHeader>
 
         {!isGitHubConnected ? (
@@ -314,58 +362,6 @@ export function GitHubIntegrationDialog({
           </div>
         ) : (
           <>
-            {/* Tabs and Selected Item Row */}
-            <div className="flex items-center justify-between mt-2">
-              <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-                <button
-                  onClick={() => {
-                    setActiveTab('issues');
-                    setSearchQuery('');
-                  }}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-1 rounded-md typography-ui-label transition-all',
-                    activeTab === 'issues'
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted-foreground/5'
-                  )}
-                >
-                  <RiGitBranchLine className="h-3.5 w-3.5" />
-                  Issues
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab('prs');
-                    setSearchQuery('');
-                  }}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-1 rounded-md typography-ui-label transition-all',
-                    activeTab === 'prs'
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted-foreground/5'
-                  )}
-                >
-                  <RiGitPullRequestLine className="h-3.5 w-3.5" />
-                  Pull Requests
-                </button>
-              </div>
-
-              {/* Selected Item Inline Display */}
-              {(selectedIssue || selectedPr) && (
-                <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50 border border-border/50 max-w-[50%]">
-                  <RiCheckLine className="h-3.5 w-3.5 text-status-success shrink-0" />
-                  <span className="typography-small truncate">
-                    {selectedIssue ? `Issue #${selectedIssue.number}` : `PR #${selectedPr?.number}`}
-                  </span>
-                  <button
-                    onClick={handleClear}
-                    className="text-muted-foreground hover:text-foreground shrink-0 p-0.5 rounded hover:bg-muted transition-colors"
-                  >
-                    <RiCloseLine className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              )}
-            </div>
-
             {/* Search */}
             <div className="relative mt-2">
               <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -378,135 +374,139 @@ export function GitHubIntegrationDialog({
             </div>
 
             {/* List Content */}
-            <div className="flex-1 overflow-y-auto mt-2 min-h-0">
-              {/* Loading */}
-              {loading && (
-                <div className="flex items-center justify-center py-8">
-                  <RiLoader4Line className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
-              )}
+            <div className="mt-2 h-[300px] overflow-hidden">
+              <div className="h-full overflow-y-auto">
+                {/* Loading */}
+                {loading && (
+                  <div className="flex items-center justify-center h-full">
+                    <RiLoader4Line className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                )}
 
-              {/* Error */}
-              {error && (
-                <div className="flex items-center gap-2 p-2 rounded-md bg-destructive/10 text-destructive">
-                  <RiErrorWarningLine className="h-4 w-4" />
-                  <span className="typography-small">{error}</span>
-                </div>
-              )}
+                {/* Error */}
+                {error && (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-destructive/10 text-destructive">
+                      <RiErrorWarningLine className="h-4 w-4" />
+                      <span className="typography-small">{error}</span>
+                    </div>
+                  </div>
+                )}
 
-              {/* Issues List */}
-              {!loading && !error && activeTab === 'issues' && (
-                <div className="space-y-0.5">
-                  {filteredIssues.length > 0 ? (
-                    filteredIssues.map(issue => (
-                      <button
-                        key={issue.number}
-                        onClick={() => handleSelectIssue(issue)}
-                        className={cn(
-                          'w-full text-left px-2 py-1.5 rounded transition-colors',
-                          selectedIssue?.number === issue.number
-                            ? 'bg-interactive-selection text-interactive-selection-foreground'
-                            : 'hover:bg-interactive-hover'
-                        )}
-                      >
-                        <div className="flex items-start gap-2">
-                          <span className="text-muted-foreground shrink-0 typography-micro">#{issue.number}</span>
-                          <span className="typography-small line-clamp-2">{issue.title}</span>
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="px-2 py-8 text-center typography-small text-muted-foreground">
-                      No issues found
-                    </div>
-                  )}
-                  
-                  {hasMore && !loadingMore && (
-                    <div className="flex justify-center pt-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void loadMore()}
-                        className="h-7 text-xs"
-                      >
-                        Load more
-                      </Button>
-                    </div>
-                  )}
-                  {loadingMore && (
-                    <div className="flex items-center justify-center py-2">
-                      <RiLoader4Line className="h-4 w-4 animate-spin text-muted-foreground" />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* PRs List */}
-              {!loading && !error && activeTab === 'prs' && (
-                <div className="space-y-0.5">
-                  {filteredPrs.length > 0 ? (
-                    filteredPrs.map(pr => {
-                      const blocked = isPrBlocked(pr);
-                      const validation = pr.head ? validations.get(pr.head) : undefined;
-                      
-                      return (
+                {/* Issues List */}
+                {!loading && !error && activeTab === 'issues' && (
+                  <div className="space-y-0.5 min-h-full">
+                    {filteredIssues.length > 0 ? (
+                      filteredIssues.map(issue => (
                         <button
-                          key={pr.number}
-                          onClick={() => !blocked && handleSelectPr(pr)}
-                          disabled={blocked}
+                          key={issue.number}
+                          onClick={() => handleSelectIssue(issue)}
                           className={cn(
                             'w-full text-left px-2 py-1.5 rounded transition-colors',
-                            selectedPr?.number === pr.number
+                            selectedIssue?.number === issue.number
                               ? 'bg-interactive-selection text-interactive-selection-foreground'
-                              : blocked
-                                ? 'opacity-50 cursor-not-allowed'
-                                : 'hover:bg-interactive-hover'
+                              : 'hover:bg-interactive-hover'
                           )}
                         >
                           <div className="flex items-start gap-2">
-                            <span className="text-muted-foreground shrink-0 typography-micro">#{pr.number}</span>
-                            <div className="min-w-0 flex-1">
-                              <span className="typography-small line-clamp-1">{pr.title}</span>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="typography-micro text-muted-foreground">
-                                  {pr.head} → {pr.base}
-                                </span>
-                                {blocked && validation?.error && (
-                                  <span className="typography-micro text-destructive">
-                                    {validation.error}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                            <span className="text-muted-foreground shrink-0 typography-micro">#{issue.number}</span>
+                            <span className="typography-small line-clamp-2">{issue.title}</span>
                           </div>
                         </button>
-                      );
-                    })
-                  ) : (
-                    <div className="px-2 py-8 text-center typography-small text-muted-foreground">
-                      No pull requests found
-                    </div>
-                  )}
-                  
-                  {hasMore && !loadingMore && (
-                    <div className="flex justify-center pt-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void loadMore()}
-                        className="h-7 text-xs"
-                      >
-                        Load more
-                      </Button>
-                    </div>
-                  )}
-                  {loadingMore && (
-                    <div className="flex items-center justify-center py-2">
-                      <RiLoader4Line className="h-4 w-4 animate-spin text-muted-foreground" />
-                    </div>
-                  )}
-                </div>
-              )}
+                      ))
+                    ) : (
+                      <div className="flex items-center justify-center h-[260px] text-center typography-small text-muted-foreground">
+                        No issues found
+                      </div>
+                    )}
+                    
+                    {hasMore && !loadingMore && (
+                      <div className="flex justify-center pt-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void loadMore()}
+                          className="h-7 text-xs"
+                        >
+                          Load more
+                        </Button>
+                      </div>
+                    )}
+                    {loadingMore && (
+                      <div className="flex items-center justify-center py-2">
+                        <RiLoader4Line className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* PRs List */}
+                {!loading && !error && activeTab === 'prs' && (
+                  <div className="space-y-0.5 min-h-full">
+                    {filteredPrs.length > 0 ? (
+                      filteredPrs.map(pr => {
+                        const blocked = isPrBlocked(pr);
+                        const validation = pr.head ? validations.get(pr.head) : undefined;
+                        
+                        return (
+                          <button
+                            key={pr.number}
+                            onClick={() => !blocked && handleSelectPr(pr)}
+                            disabled={blocked}
+                            className={cn(
+                              'w-full text-left px-2 py-1.5 rounded transition-colors',
+                              selectedPr?.number === pr.number
+                                ? 'bg-interactive-selection text-interactive-selection-foreground'
+                                : blocked
+                                  ? 'opacity-50 cursor-not-allowed'
+                                  : 'hover:bg-interactive-hover'
+                            )}
+                          >
+                            <div className="flex items-start gap-2">
+                              <span className="text-muted-foreground shrink-0 typography-micro">#{pr.number}</span>
+                              <div className="min-w-0 flex-1">
+                                <span className="typography-small line-clamp-1">{pr.title}</span>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="typography-micro text-muted-foreground">
+                                    {pr.head} → {pr.base}
+                                  </span>
+                                  {blocked && validation?.error && (
+                                    <span className="typography-micro text-destructive">
+                                      {validation.error}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="flex items-center justify-center h-[260px] text-center typography-small text-muted-foreground">
+                        No pull requests found
+                      </div>
+                    )}
+                    
+                    {hasMore && !loadingMore && (
+                      <div className="flex justify-center pt-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void loadMore()}
+                          className="h-7 text-xs"
+                        >
+                          Load more
+                        </Button>
+                      </div>
+                    )}
+                    {loadingMore && (
+                      <div className="flex items-center justify-center py-2">
+                        <RiLoader4Line className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Footer with inline checkbox for PR diff */}
