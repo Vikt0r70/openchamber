@@ -332,6 +332,7 @@ const UserMessageBody: React.FC<{
     const hasCopyableText = Boolean(hasTextContent);
     const showUserContent = userActionsMode !== 'external-actions';
     const showUserActions = userActionsMode !== 'external-content';
+    const useStickyScrollableUserContent = stickyUserHeaderEnabled && showUserContent;
 
     const clearCopyHintTimeout = React.useCallback(() => {
         if (copyHintTimeoutRef.current !== null && typeof window !== 'undefined') {
@@ -490,7 +491,14 @@ const UserMessageBody: React.FC<{
             style={{ contain: 'layout', transform: 'translateZ(0)' }}
             onTouchStart={isTouchContext && canCopyMessage && hasCopyableText ? revealCopyHint : undefined}
         >
-            <div className="leading-relaxed overflow-hidden text-foreground/90 text-base">
+            <div
+                className={cn(
+                    'leading-relaxed text-foreground/90 text-base overflow-x-hidden',
+                    useStickyScrollableUserContent
+                        ? 'max-h-[calc(var(--chat-scroll-height,100dvh)*0.5)] overflow-y-auto overscroll-contain'
+                        : 'overflow-y-hidden'
+                )}
+            >
                 {userContentParts.map((part, index) => {
                     if (isSubtaskPart(part)) {
                         return (
