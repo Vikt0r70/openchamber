@@ -1424,10 +1424,17 @@ const AssistantMessageBody: React.FC<Omit<MessageBodyProps, 'isUser'>> = ({
                                                 </span>
                                             ) : null}
                                             {footerTimestamp ? (
-                                                <span className="text-sm text-muted-foreground/60 tabular-nums flex items-center gap-1">
-                                                    <RiTimeLine className="h-3.5 w-3.5" />
-                                                    {footerTimestamp}
-                                                </span>
+                                                <Tooltip delayDuration={300}>
+                                                    <TooltipTrigger asChild>
+                                                        <span
+                                                            className="text-sm text-muted-foreground/60 tabular-nums flex items-center"
+                                                            aria-label={`Message time: ${footerTimestamp}`}
+                                                        >
+                                                            <RiTimeLine className="h-3.5 w-3.5" />
+                                                        </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent sideOffset={6}>{footerTimestamp}</TooltipContent>
+                                                </Tooltip>
                                             ) : null}
                                         </div>
                                     </div>
@@ -1450,10 +1457,17 @@ const AssistantMessageBody: React.FC<Omit<MessageBodyProps, 'isUser'>> = ({
                                 </span>
                             ) : null}
                             {footerTimestamp ? (
-                                <span className="text-sm text-muted-foreground/60 tabular-nums flex items-center gap-1">
-                                    <RiTimeLine className="h-3.5 w-3.5" />
-                                    {footerTimestamp}
-                                </span>
+                                <Tooltip delayDuration={300}>
+                                    <TooltipTrigger asChild>
+                                        <span
+                                            className="text-sm text-muted-foreground/60 tabular-nums flex items-center"
+                                            aria-label={`Message time: ${footerTimestamp}`}
+                                        >
+                                            <RiTimeLine className="h-3.5 w-3.5" />
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent sideOffset={6}>{footerTimestamp}</TooltipContent>
+                                </Tooltip>
                             ) : null}
                         </div>
                     </div>
