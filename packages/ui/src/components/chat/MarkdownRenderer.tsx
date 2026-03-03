@@ -17,6 +17,7 @@ import { getDefaultTheme } from '@/lib/theme/themes';
 import type { ToolPopupContent } from './message/types';
 import { useUIStore } from '@/stores/useUIStore';
 import { useDeviceInfo } from '@/lib/device';
+import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 
 const withStableStringId = <T extends object>(value: T, id: string): T => {
   const existingPrimitive = (value as Record<symbol, unknown>)[Symbol.toPrimitive];
@@ -682,6 +683,338 @@ interface MarkdownRendererProps {
 }
 
 const MERMAID_BLOCK_SELECTOR = '[data-streamdown="mermaid-block"]';
+const FILE_LINK_SELECTOR = '[data-openchamber-file-link="true"]';
+
+type ParsedFileReference = {
+  path: string;
+  line?: number;
+  column?: number;
+};
+
+const WINDOWS_DRIVE_PATH_PATTERN = /^[A-Za-z]:[\\/]/;
+const WINDOWS_UNC_PATH_PATTERN = /^\\\\[^\\]+\\[^\\]+/;
+const KNOWN_FILE_BASENAMES = new Set([
+  'dockerfile',
+  'makefile',
+  'readme',
+  'license',
+  '.env',
+  '.gitignore',
+  '.npmrc',
+]);
+
+const normalizePath = (value: string): string => {
+  const source = (value || '').trim();
+  if (!source) {
+    return '';
+  }
+
+  const withSlashes = source.replace(/\\/g, '/');
+  const hadUncPrefix = withSlashes.startsWith('//');
+
+  let normalized = withSlashes.replace(/\/+/g, '/');
+  if (hadUncPrefix && !normalized.startsWith('//')) {
+    normalized = `/${normalized}`;
+  }
+
+  const isUnixRoot = normalized === '/';
+  const isWindowsDriveRoot = /^[A-Za-z]:\/$/.test(normalized);
+  if (!isUnixRoot && !isWindowsDriveRoot) {
+    normalized = normalized.replace(/\/+$/, '');
+  }
+
+  return normalized;
+};
+
+const isAbsolutePath = (value: string): boolean => {
+  return value.startsWith('/')
+    || WINDOWS_DRIVE_PATH_PATTERN.test(value)
+    || WINDOWS_UNC_PATH_PATTERN.test(value)
+    || value.startsWith('//');
+};
+
+const toAbsolutePath = (basePath: string, targetPath: string): string => {
+  const normalizedTarget = normalizePath(targetPath);
+  if (!normalizedTarget) {
+    return normalizePath(basePath);
+  }
+
+  if (isAbsolutePath(normalizedTarget)) {
+    return normalizedTarget;
+  }
+
+  const normalizedBase = normalizePath(basePath);
+  if (!normalizedBase) {
+    return normalizedTarget;
+  }
+
+  const isWindowsDriveBase = /^[A-Za-z]:/.test(normalizedBase);
+  const prefix = isWindowsDriveBase ? normalizedBase.slice(0, 2) : '';
+  const baseRemainder = isWindowsDriveBase ? normalizedBase.slice(2) : normalizedBase;
+
+  const stack = baseRemainder.split('/').filter(Boolean);
+  const parts = normalizedTarget.split('/').filter(Boolean);
+  for (const part of parts) {
+    if (part === '.') {
+      continue;
+    }
+    if (part === '..') {
+      if (stack.length > 0) {
+        stack.pop();
+      }
+      continue;
+    }
+    stack.push(part);
+  }
+
+  if (isWindowsDriveBase) {
+    return `${prefix}/${stack.join('/')}`;
+  }
+
+  return `/${stack.join('/')}`;
+};
+
+const trimPathCandidate = (value: string): string => {
+  let next = (value || '').trim();
+  if (!next) {
+    return '';
+  }
+
+  if ((next.startsWith('`') && next.endsWith('`')) || (next.startsWith('"') && next.endsWith('"')) || (next.startsWith("'") && next.endsWith("'"))) {
+    next = next.slice(1, -1).trim();
+  }
+
+  next = next.replace(/[.,;!?]+$/g, '');
+
+  if (next.endsWith(')') && !next.includes('(')) {
+    next = next.slice(0, -1);
+  }
+  if (next.endsWith(']') && !next.includes('[')) {
+    next = next.slice(0, -1);
+  }
+
+  return next;
+};
+
+const parseFileReference = (value: string): ParsedFileReference | null => {
+  const trimmed = trimPathCandidate(value);
+  if (!trimmed) {
+    return null;
+  }
+
+  const hashMatch = trimmed.match(/^(.*)#L(\d+)(?:C(\d+))?$/i);
+  if (hashMatch) {
+    const path = trimPathCandidate(hashMatch[1] ?? '');
+    const line = Number.parseInt(hashMatch[2] ?? '', 10);
+    const column = hashMatch[3] ? Number.parseInt(hashMatch[3], 10) : undefined;
+    if (!path || !Number.isFinite(line)) {
+      return null;
+    }
+    return {
+      path,
+      line,
+      column: Number.isFinite(column ?? NaN) ? column : undefined,
+    };
+  }
+
+  const colonMatch = trimmed.match(/^(.*):(\d+)(?::(\d+))?$/);
+  if (colonMatch) {
+    const path = trimPathCandidate(colonMatch[1] ?? '');
+    const line = Number.parseInt(colonMatch[2] ?? '', 10);
+    const column = colonMatch[3] ? Number.parseInt(colonMatch[3], 10) : undefined;
+    if (!path || !Number.isFinite(line)) {
+      return null;
+    }
+    return {
+      path,
+      line,
+      column: Number.isFinite(column ?? NaN) ? column : undefined,
+    };
+  }
+
+  return { path: trimmed };
+};
+
+const hasFileExtension = (path: string): boolean => {
+  const base = path.split('/').filter(Boolean).pop() ?? '';
+  if (!base || base.endsWith('.')) {
+    return false;
+  }
+  return /\.[A-Za-z0-9_-]{1,16}$/.test(base);
+};
+
+const isLikelyFilePath = (value: string): boolean => {
+  const parsed = parseFileReference(value);
+  if (!parsed) {
+    return false;
+  }
+
+  const path = parsed.path;
+  if (!path || path.startsWith('--') || path.includes('://')) {
+    return false;
+  }
+
+  if (/[<>]/.test(path) || /\s{2,}/.test(path)) {
+    return false;
+  }
+
+  const normalized = normalizePath(path);
+  const baseName = normalized.split('/').filter(Boolean).pop() ?? normalized;
+  if (!baseName || baseName === '.' || baseName === '..') {
+    return false;
+  }
+
+  const base = baseName.toLowerCase();
+  if (KNOWN_FILE_BASENAMES.has(base) || (base.startsWith('.') && base.length > 1)) {
+    return true;
+  }
+
+  return hasFileExtension(normalized);
+};
+
+const extractPathCandidateFromElement = (element: HTMLElement): string => {
+  if (element.tagName.toLowerCase() === 'a') {
+    const href = element.getAttribute('href')?.trim();
+    if (href && isLikelyFilePath(href)) {
+      return href;
+    }
+  }
+
+  return (element.textContent || '').trim();
+};
+
+const getContextDirectory = (effectiveDirectory: string, resolvedPath: string): string => {
+  const normalizedDirectory = normalizePath(effectiveDirectory);
+  if (normalizedDirectory) {
+    return normalizedDirectory;
+  }
+
+  const normalizedPath = normalizePath(resolvedPath);
+  const parent = normalizedPath.replace(/\/[^/]*$/, '');
+  return parent || normalizedPath;
+};
+
+const useFileReferenceInteractions = ({
+  containerRef,
+  effectiveDirectory,
+}: {
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  effectiveDirectory: string;
+}) => {
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const annotateFileLinks = () => {
+      const candidates = container.querySelectorAll<HTMLElement>('[data-streamdown="inline-code"], a');
+      candidates.forEach((candidate) => {
+        const rawCandidate = extractPathCandidateFromElement(candidate);
+        const isFileRef = isLikelyFilePath(rawCandidate);
+
+        if (!isFileRef) {
+          candidate.removeAttribute('data-openchamber-file-link');
+          candidate.removeAttribute('data-openchamber-file-ref');
+          if (candidate.getAttribute('title') === 'Open file') {
+            candidate.removeAttribute('title');
+          }
+          if (candidate.tagName.toLowerCase() !== 'a') {
+            candidate.removeAttribute('role');
+            candidate.removeAttribute('tabindex');
+          }
+          return;
+        }
+
+        candidate.setAttribute('data-openchamber-file-link', 'true');
+        candidate.setAttribute('data-openchamber-file-ref', rawCandidate);
+        candidate.setAttribute('title', 'Open file');
+        if (candidate.tagName.toLowerCase() !== 'a') {
+          candidate.setAttribute('role', 'button');
+          candidate.setAttribute('tabindex', '0');
+        }
+      });
+    };
+
+    const openFileReference = (sourceElement: HTMLElement): boolean => {
+      const raw = sourceElement.getAttribute('data-openchamber-file-ref') || extractPathCandidateFromElement(sourceElement);
+      const parsed = parseFileReference(raw);
+      if (!parsed || !isLikelyFilePath(raw)) {
+        return false;
+      }
+
+      const resolvedPath = isAbsolutePath(parsed.path)
+        ? normalizePath(parsed.path)
+        : toAbsolutePath(effectiveDirectory, parsed.path);
+      if (!resolvedPath) {
+        return false;
+      }
+
+      const contextDirectory = getContextDirectory(effectiveDirectory, resolvedPath);
+      const uiStore = useUIStore.getState();
+      if (parsed.line && Number.isFinite(parsed.line)) {
+        uiStore.openContextFileAtLine(contextDirectory, resolvedPath, parsed.line, parsed.column ?? 1);
+        return true;
+      }
+
+      uiStore.openContextFile(contextDirectory, resolvedPath);
+      return true;
+    };
+
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const fileRefElement = target.closest(FILE_LINK_SELECTOR);
+      if (!(fileRefElement instanceof HTMLElement)) {
+        return;
+      }
+
+      if (!openFileReference(fileRefElement)) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+      }
+
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || target.getAttribute('data-openchamber-file-link') !== 'true') {
+        return;
+      }
+
+      if (!openFileReference(target)) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    annotateFileLinks();
+
+    const observer = new MutationObserver(() => {
+      annotateFileLinks();
+    });
+    observer.observe(container, { childList: true, subtree: true, characterData: true });
+
+    container.addEventListener('click', handleClick);
+    container.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      observer.disconnect();
+      container.removeEventListener('click', handleClick);
+      container.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [containerRef, effectiveDirectory]);
+};
 
 const useMermaidInlineInteractions = ({
   containerRef,
@@ -787,8 +1120,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   onShowPopup,
 }) => {
   const streamdownContainerRef = React.useRef<HTMLDivElement>(null);
+  const effectiveDirectory = useEffectiveDirectory() ?? '';
   const mermaidBlocks = React.useMemo(() => extractMermaidBlocks(content), [content]);
   useMermaidInlineInteractions({ containerRef: streamdownContainerRef, mermaidBlocks, onShowPopup });
+  useFileReferenceInteractions({ containerRef: streamdownContainerRef, effectiveDirectory });
 
   const shikiThemes = useMarkdownShikiThemes();
   const streamdownPlugins = useStreamdownPlugins(shikiThemes);
@@ -849,6 +1184,7 @@ export const SimpleMarkdownRenderer: React.FC<{
     [content, stripFrontmatter],
   );
   const streamdownContainerRef = React.useRef<HTMLDivElement>(null);
+  const effectiveDirectory = useEffectiveDirectory() ?? '';
   const mermaidBlocks = React.useMemo(() => extractMermaidBlocks(renderedContent), [renderedContent]);
   useMermaidInlineInteractions({
     containerRef: streamdownContainerRef,
@@ -856,6 +1192,7 @@ export const SimpleMarkdownRenderer: React.FC<{
     onShowPopup,
     allowWheelZoom: allowMermaidWheelZoom,
   });
+  useFileReferenceInteractions({ containerRef: streamdownContainerRef, effectiveDirectory });
 
   const shikiThemes = useMarkdownShikiThemes();
   const streamdownPlugins = useStreamdownPlugins(shikiThemes);
