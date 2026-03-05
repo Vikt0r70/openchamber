@@ -42,6 +42,7 @@ const FOLDERS_STORAGE_KEY = 'oc.sessions.folders';
 const COLLAPSED_STORAGE_KEY = 'oc.sessions.folderCollapse';
 const SESSIONS_DIRECTORIES_PATH_SUFFIX = '.config/openchamber/sessions-directories.json';
 const DISK_WRITE_DEBOUNCE_MS = 250;
+const ARCHIVED_SCOPE_PREFIX = '__archived__:';
 
 const safeStorage = getSafeStorage();
 let diskWriteTimer: ReturnType<typeof setTimeout> | null = null;
@@ -215,6 +216,14 @@ const syncCollapsedAfterFolderCleanup = (
   return nextCollapsed;
 };
 
+const pruneEmptyArchivedFolders = (scopeKey: string, folders: SessionFolder[]): SessionFolder[] => {
+  if (!scopeKey.startsWith(ARCHIVED_SCOPE_PREFIX)) {
+    return folders;
+  }
+
+  return folders.filter((folder) => folder.sessionIds.length > 0);
+};
+
 // --- Store ---
 
 export const useSessionFoldersStore = create<SessionFoldersStore>()(
@@ -367,7 +376,7 @@ export const useSessionFoldersStore = create<SessionFoldersStore>()(
         if (!scopeFolders || scopeFolders.length === 0) return;
 
         let changed = false;
-        const nextFolders = scopeFolders.map((folder) => {
+        const filteredFolders = scopeFolders.map((folder) => {
           const filtered = folder.sessionIds.filter((id) => existingSessionIds.has(id));
           if (filtered.length !== folder.sessionIds.length) {
             changed = true;
@@ -375,6 +384,11 @@ export const useSessionFoldersStore = create<SessionFoldersStore>()(
           }
           return folder;
         });
+
+        const nextFolders = pruneEmptyArchivedFolders(scopeKey, filteredFolders);
+        if (nextFolders.length !== filteredFolders.length) {
+          changed = true;
+        }
 
         if (!changed) return;
         const nextMap: SessionFoldersMap = { ...current, [scopeKey]: nextFolders };

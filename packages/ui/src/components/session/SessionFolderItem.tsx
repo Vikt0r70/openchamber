@@ -28,6 +28,7 @@ interface SessionFolderItemProps<TSessionNode> {
     depth?: number,
     groupDir?: string | null,
     projectId?: string | null,
+    archivedBucket?: boolean,
   ) => React.ReactNode;
   groupDirectory?: string | null;
   projectId?: string | null;
@@ -49,6 +50,8 @@ interface SessionFolderItemProps<TSessionNode> {
   depth?: number;
   /** Hide folder action buttons (rename/delete/new) */
   hideActions?: boolean;
+  /** Whether folder belongs to archived section */
+  archivedBucket?: boolean;
 }
 
 const SessionFolderItemBase = <TSessionNode,>({
@@ -74,6 +77,7 @@ const SessionFolderItemBase = <TSessionNode,>({
   onNewSubFolder,
   depth = 0,
   hideActions = false,
+  archivedBucket = false,
 }: SessionFolderItemProps<TSessionNode>) => {
   const [localRenaming, setLocalRenaming] = React.useState(false);
   const [localDraft, setLocalDraft] = React.useState('');
@@ -303,7 +307,7 @@ const SessionFolderItemBase = <TSessionNode,>({
           {/* Then sessions */}
           {sessions.length > 0 ? (
             sessions.map((node) =>
-              renderSessionNode(node, 0, groupDirectory ?? null, projectId ?? null),
+              renderSessionNode(node, 0, groupDirectory ?? null, projectId ?? null, archivedBucket),
             )
           ) : !subFolderItems ? (
             <div className="py-1 pl-1.5 text-left typography-micro text-muted-foreground/70">

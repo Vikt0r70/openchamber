@@ -3313,6 +3313,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
                   createFolderAndStartRename(folderScopeKey, folder.id);
                 } : undefined}
                 hideActions={group.isArchivedBucket === true}
+                archivedBucket={group.isArchivedBucket === true}
               />
             )}
           </DroppableFolderWrapper>
