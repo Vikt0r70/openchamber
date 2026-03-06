@@ -234,48 +234,130 @@ export function SessionNodeItem(props: Props): React.ReactNode {
           }}
         >
           <div className="flex min-w-0 flex-1 items-center">
-            <button
-              type="button"
-              disabled={isMissingDirectory}
-              onClick={() => handleSessionSelect(session.id, sessionDirectory, isMissingDirectory, projectId)}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                handleSessionDoubleClick();
-              }}
-              className={cn('flex min-w-0 flex-1 cursor-pointer flex-col gap-0 overflow-hidden rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 text-foreground select-none disabled:cursor-not-allowed transition-[padding]', mobileVariant ? 'pr-7' : 'group-hover:pr-5 group-focus-within:pr-5')}
-            >
-              <div className={cn('flex w-full items-center min-w-0 flex-1 overflow-hidden', isMinimalMode ? 'gap-1' : 'gap-2')}>
-                {isMinimalMode && hasChildren ? (
-                  <span role="button" tabIndex={0} onClick={(event) => { event.stopPropagation(); toggleParent(session.id); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); toggleParent(session.id); } }} className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 flex-shrink-0 rounded-sm" aria-label={isExpanded ? 'Collapse subsessions' : 'Expand subsessions'}>
-                    {isExpanded ? <RiArrowDownSLine className="h-3 w-3" /> : <RiArrowRightSLine className="h-3 w-3" />}
-                  </span>
-                ) : null}
-                {showStatusMarker ? (
-                  <span className="inline-flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center">
-                    {isStreaming ? (
-                      <GridLoader size="xs" className="text-primary" />
-                    ) : (
-                      <span className="grid grid-cols-3 gap-[1px] text-[var(--status-info)]" aria-label="Unread updates" title="Unread updates">
-                        {Array.from({ length: 9 }, (_, i) => (
-                          ATTENTION_DIAMOND_INDICES.has(i) ? (
-                            <span key={i} className="h-[3px] w-[3px] rounded-full bg-current animate-attention-diamond-pulse" style={{ animationDelay: getAttentionDiamondDelay(i) }} />
+            {isMinimalMode ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={isMissingDirectory}
+                    onClick={() => handleSessionSelect(session.id, sessionDirectory, isMissingDirectory, projectId)}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      handleSessionDoubleClick();
+                    }}
+                    className={cn('flex min-w-0 flex-1 cursor-pointer flex-col gap-0 overflow-hidden rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 text-foreground select-none disabled:cursor-not-allowed transition-[padding]', mobileVariant ? 'pr-7' : 'group-hover:pr-5 group-focus-within:pr-5')}
+                  >
+                    <div className={cn('flex w-full items-center min-w-0 flex-1 overflow-hidden', isMinimalMode ? 'gap-1' : 'gap-2')}>
+                      {isMinimalMode && hasChildren ? (
+                        <span role="button" tabIndex={0} onClick={(event) => { event.stopPropagation(); toggleParent(session.id); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); toggleParent(session.id); } }} className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 flex-shrink-0 rounded-sm" aria-label={isExpanded ? 'Collapse subsessions' : 'Expand subsessions'}>
+                          {isExpanded ? <RiArrowDownSLine className="h-3 w-3" /> : <RiArrowRightSLine className="h-3 w-3" />}
+                        </span>
+                      ) : null}
+                      {showStatusMarker ? (
+                        <span className="inline-flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center">
+                          {isStreaming ? (
+                            <GridLoader size="xs" className="text-primary" />
                           ) : (
-                            <span key={i} className="h-[3px] w-[3px]" />
-                          )
-                        ))}
-                      </span>
-                    )}
-                  </span>
-                ) : null}
-                {isPinnedSession ? <RiPushpinLine className="h-3 w-3 flex-shrink-0 text-primary" aria-label="Pinned session" /> : null}
-                <div className="block min-w-0 flex-1 truncate typography-ui-label font-normal text-foreground">{renderHighlightedText(sessionTitle, normalizedSessionSearchQuery)}</div>
-                {pendingPermissionCount > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1 py-0.5 text-[0.7rem] text-destructive flex-shrink-0" title="Permission required" aria-label="Permission required">
-                    <RiShieldLine className="h-3 w-3" />
-                    <span className="leading-none">{pendingPermissionCount}</span>
-                  </span>
-                ) : null}
-              </div>
+                            <span className="grid grid-cols-3 gap-[1px] text-[var(--status-info)]" aria-label="Unread updates" title="Unread updates">
+                              {Array.from({ length: 9 }, (_, i) => (
+                                ATTENTION_DIAMOND_INDICES.has(i) ? (
+                                  <span key={i} className="h-[3px] w-[3px] rounded-full bg-current animate-attention-diamond-pulse" style={{ animationDelay: getAttentionDiamondDelay(i) }} />
+                                ) : (
+                                  <span key={i} className="h-[3px] w-[3px]" />
+                                )
+                              ))}
+                            </span>
+                          )}
+                        </span>
+                      ) : null}
+                      {isPinnedSession ? <RiPushpinLine className="h-3 w-3 flex-shrink-0 text-primary" aria-label="Pinned session" /> : null}
+                      <div className="block min-w-0 flex-1 truncate typography-ui-label font-normal text-foreground">{renderHighlightedText(sessionTitle, normalizedSessionSearchQuery)}</div>
+                      {pendingPermissionCount > 0 ? (
+                        <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1 py-0.5 text-[0.7rem] text-destructive flex-shrink-0" title="Permission required" aria-label="Permission required">
+                          <RiShieldLine className="h-3 w-3" />
+                          <span className="leading-none">{pendingPermissionCount}</span>
+                        </span>
+                      ) : null}
+                    </div>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={8} className="max-w-xs">
+                  <div className="flex flex-col gap-1 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">{formatSessionDateLabel(session.time?.updated || session.time?.created || Date.now())}</span>
+                      {sessionDiffStats ? (
+                        <span className="flex items-center gap-1">
+                          <span className="text-status-success">+{sessionDiffStats.additions}</span>
+                          <span className="text-muted-foreground">/</span>
+                          <span className="text-status-error">-{sessionDiffStats.deletions}</span>
+                        </span>
+                      ) : null}
+                    </div>
+                    {session.share ? (
+                      <div className="flex items-center gap-1 text-[color:var(--status-info)]">
+                        <RiShare2Line className="h-3 w-3" />
+                        <span>Shared session</span>
+                      </div>
+                    ) : null}
+                    {(sessionSummary?.files ?? 0) > 0 ? (
+                      <div className="flex items-center gap-1">
+                        <RiFileEditLine className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">{sessionSummary!.files} changed {sessionSummary!.files === 1 ? 'file' : 'files'}</span>
+                      </div>
+                    ) : null}
+                    {hasChildren ? (
+                      <div className="flex items-center gap-1">
+                        <RiRobot2Line className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">{node.children.length} {node.children.length === 1 ? 'sub-session' : 'sub-sessions'}</span>
+                      </div>
+                    ) : null}
+                    {isMissingDirectory ? (
+                      <div className="flex items-center gap-1 text-status-warning">
+                        <RiErrorWarningLine className="h-3 w-3" />
+                        <span>Directory missing</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <button
+                type="button"
+                disabled={isMissingDirectory}
+                onClick={() => handleSessionSelect(session.id, sessionDirectory, isMissingDirectory, projectId)}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  handleSessionDoubleClick();
+                }}
+                className={cn('flex min-w-0 flex-1 cursor-pointer flex-col gap-0 overflow-hidden rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 text-foreground select-none disabled:cursor-not-allowed transition-[padding]', mobileVariant ? 'pr-7' : 'group-hover:pr-5 group-focus-within:pr-5')}
+              >
+                <div className={cn('flex w-full items-center min-w-0 flex-1 overflow-hidden', isMinimalMode ? 'gap-1' : 'gap-2')}>
+                  {showStatusMarker ? (
+                    <span className="inline-flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center">
+                      {isStreaming ? (
+                        <GridLoader size="xs" className="text-primary" />
+                      ) : (
+                        <span className="grid grid-cols-3 gap-[1px] text-[var(--status-info)]" aria-label="Unread updates" title="Unread updates">
+                          {Array.from({ length: 9 }, (_, i) => (
+                            ATTENTION_DIAMOND_INDICES.has(i) ? (
+                              <span key={i} className="h-[3px] w-[3px] rounded-full bg-current animate-attention-diamond-pulse" style={{ animationDelay: getAttentionDiamondDelay(i) }} />
+                            ) : (
+                              <span key={i} className="h-[3px] w-[3px]" />
+                            )
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                  ) : null}
+                  {isPinnedSession ? <RiPushpinLine className="h-3 w-3 flex-shrink-0 text-primary" aria-label="Pinned session" /> : null}
+                  <div className="block min-w-0 flex-1 truncate typography-ui-label font-normal text-foreground">{renderHighlightedText(sessionTitle, normalizedSessionSearchQuery)}</div>
+                  {pendingPermissionCount > 0 ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1 py-0.5 text-[0.7rem] text-destructive flex-shrink-0" title="Permission required" aria-label="Permission required">
+                      <RiShieldLine className="h-3 w-3" />
+                      <span className="leading-none">{pendingPermissionCount}</span>
+                    </span>
+                  ) : null}
+                </div>
 
               {!isMinimalMode ? (
                 <div className="flex items-center gap-2 text-muted-foreground/60 min-w-0 overflow-hidden leading-tight" style={{ fontSize: 'calc(var(--text-ui-label) * 0.85)' }}>
@@ -296,7 +378,8 @@ export function SessionNodeItem(props: Props): React.ReactNode {
                   {isMissingDirectory ? <span className="inline-flex items-center gap-0.5 text-status-warning flex-shrink-0"><RiErrorWarningLine className="h-3 w-3" />Missing</span> : null}
                 </div>
               ) : null}
-            </button>
+              </button>
+            )}
           </div>
 
           {streamingIndicator && !mobileVariant ? (
