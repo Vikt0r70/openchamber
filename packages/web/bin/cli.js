@@ -1335,6 +1335,9 @@ function warnIfUnsafeFilePermissions(filePath) {
   if (process.platform === 'win32') {
     return;
   }
+  if (isJsonMode(activeCommandOptions) || isQuietMode(activeCommandOptions)) {
+    return;
+  }
   try {
     const stats = fs.statSync(filePath);
     const perms = stats.mode & 0o777;
@@ -2360,11 +2363,13 @@ async function handleTunnelProfileSubcommand(options, action) {
       printJson({ profile: redactProfileForOutput(profile, options.showSecrets) });
       return;
     }
-    if (!isQuietMode(options)) {
-      clackIntro('Tunnel Profile');
-      logStatus('success', `${profile.name} (${profile.provider}/${profile.mode})`, `${profile.hostname} ${formatProfileTokenStatus(profile, options.showSecrets)}`);
-      clackOutro('show complete');
+    if (isQuietMode(options)) {
+      process.stdout.write(`${profile.name} ${profile.provider}/${profile.mode} ${profile.hostname} ${formatProfileTokenStatus(profile, options.showSecrets)}\n`);
+      return;
     }
+    clackIntro('Tunnel Profile');
+    logStatus('success', `${profile.name} (${profile.provider}/${profile.mode})`, `${profile.hostname} ${formatProfileTokenStatus(profile, options.showSecrets)}`);
+    clackOutro('show complete');
     return;
   }
 
@@ -2548,14 +2553,17 @@ async function handleTunnelProfileSubcommand(options, action) {
       return;
     }
 
-    if (!isQuietMode(options)) {
-      console.log('');
-      clackIntro(boldText('Tunnel Profile Saved'));
-      logStatus('success', `${added.name} (${added.provider}/${added.mode})`, `${added.hostname} ${formatProfileTokenStatus(added, options.showSecrets)}`);
-      clackOutro('save complete');
-      logStatus('info', '[START_PROFILE]', `openchamber tunnel start --profile ${added.name}`);
-      clackOutro('');
+    if (isQuietMode(options)) {
+      process.stdout.write(`saved ${added.name} ${added.provider}/${added.mode} ${added.hostname}\n`);
+      return;
     }
+
+    console.log('');
+    clackIntro(boldText('Tunnel Profile Saved'));
+    logStatus('success', `${added.name} (${added.provider}/${added.mode})`, `${added.hostname} ${formatProfileTokenStatus(added, options.showSecrets)}`);
+    clackOutro('save complete');
+    logStatus('info', '[START_PROFILE]', `openchamber tunnel start --profile ${added.name}`);
+    clackOutro('');
     return;
   }
 
@@ -2579,11 +2587,14 @@ async function handleTunnelProfileSubcommand(options, action) {
       return;
     }
 
-    if (!isQuietMode(options)) {
-      clackIntro('Tunnel Profile Removed');
-      logStatus('success', `${profile.name} (${profile.provider}/${profile.mode})`, profile.hostname);
-      clackOutro('remove complete');
+    if (isQuietMode(options)) {
+      process.stdout.write(`removed ${profile.name} ${profile.provider}/${profile.mode} ${profile.hostname}\n`);
+      return;
     }
+
+    clackIntro('Tunnel Profile Removed');
+    logStatus('success', `${profile.name} (${profile.provider}/${profile.mode})`, profile.hostname);
+    clackOutro('remove complete');
     return;
   }
 
@@ -2790,6 +2801,21 @@ const commands = {
   async stop(options) {
     const showOutput = shouldRenderHumanOutput(options);
     const jsonResults = [];
+    const printQuietStopResults = () => {
+      if (!isQuietMode(options) || isJsonMode(options)) return;
+      if (jsonResults.length === 0) {
+        process.stdout.write('none\n');
+        return;
+      }
+      for (const result of jsonResults) {
+        if (result.stopped) {
+          process.stdout.write(`stopped ${result.port}\n`);
+        } else {
+          const reason = result.reason || 'failed';
+          process.stderr.write(`failed ${result.port} ${reason}\n`);
+        }
+      }
+    };
     const finish = (text) => {
       if (!showOutput) return;
       clackOutro(text);
@@ -2808,6 +2834,7 @@ const commands = {
         logStatus('info', 'No running OpenChamber instances found');
         finish('nothing to stop');
       }
+      printQuietStopResults();
       return;
     }
 
@@ -2824,6 +2851,7 @@ const commands = {
             logStatus('warning', `port ${options.port} is managed by OpenChamber Desktop`, 'cannot be stopped with this command');
             finish('no changes applied');
           }
+          printQuietStopResults();
           return;
         }
 
@@ -2858,6 +2886,7 @@ const commands = {
               logStatus('success', `stopped OpenChamber on port ${options.port}`);
               finish('stop complete');
             }
+            printQuietStopResults();
           } else if (requested) {
             jsonResults.push({ port: options.port, runtime: 'unmanaged', stopped: false, reason: 'shutdown-requested-port-busy' });
             if (isJsonMode(options)) {
@@ -2872,6 +2901,7 @@ const commands = {
               logStatus('warning', `shutdown requested on port ${options.port}`, 'port is still occupied');
               finish('partial stop');
             }
+            printQuietStopResults();
           } else {
             jsonResults.push({ port: options.port, runtime: 'unmanaged', stopped: false, reason: 'stop-failed' });
             if (isJsonMode(options)) {
@@ -2886,6 +2916,7 @@ const commands = {
               logStatus('error', `could not stop OpenChamber on port ${options.port}`);
               finish('failed');
             }
+            printQuietStopResults();
           }
           return;
         }
@@ -2898,6 +2929,7 @@ const commands = {
           logStatus('info', `no OpenChamber instance found on port ${options.port}`);
           finish('nothing to stop');
         }
+        printQuietStopResults();
         return;
       }
     }
@@ -2927,7 +2959,7 @@ const commands = {
         jsonResults.push({ port: instance.port, pid: instance.pid, stopped: false, reason: error instanceof Error ? error.message : String(error) });
         if (showOutput) {
           logStatus('error', `error stopping port ${instance.port}`, error.message);
-        } else if (!isJsonMode(options)) {
+        } else if (!isJsonMode(options) && !isQuietMode(options)) {
           console.error(`Error stopping port ${instance.port}: ${error.message}`);
         }
       }
@@ -2945,6 +2977,7 @@ const commands = {
     }
 
     finish(`${runningInstances.length} instance(s)`);
+    printQuietStopResults();
   },
 
   async restart(options) {
@@ -2963,6 +2996,8 @@ const commands = {
       if (showOutput) {
         logStatus('info', 'No running OpenChamber instances to restart');
         clackOutro('nothing to restart');
+      } else if (isQuietMode(options)) {
+        process.stdout.write('restarted 0\n');
       }
       return;
     }
@@ -2976,6 +3011,8 @@ const commands = {
         if (showOutput) {
           logStatus('warning', `no OpenChamber instance found on port ${options.port}`);
           clackOutro('nothing to restart');
+        } else if (isQuietMode(options)) {
+          process.stdout.write('restarted 0\n');
         }
         return;
       }
@@ -3009,6 +3046,8 @@ const commands = {
 
     if (showOutput) {
       clackOutro(`${runningInstances.length} instance(s) restarted`);
+    } else if (isQuietMode(options)) {
+      process.stdout.write(`restarted ${restarted.length}\n`);
     }
   },
 
@@ -3132,6 +3171,22 @@ const commands = {
 
         if (isJsonMode(options)) {
           printJson({ instances: results });
+          return;
+        }
+
+        if (isQuietMode(options)) {
+          for (const result of results) {
+            if (result.error) {
+              process.stderr.write(`port ${result.port} failed: ${result.error}\n`);
+              continue;
+            }
+            const providerId = result.result?.provider || provider;
+            if (result.result?.available) {
+              process.stdout.write(`port ${result.port} ready ${providerId} ${result.result?.version || 'unknown'}\n`);
+            } else {
+              process.stdout.write(`port ${result.port} not-ready ${providerId} ${result.result?.message || 'not ready'}\n`);
+            }
+          }
           return;
         }
 
@@ -3321,6 +3376,43 @@ const commands = {
             modes: doctorResult?.modes || [],
             error: doctorError || undefined,
           });
+          return;
+        }
+
+        if (isQuietMode(options)) {
+          const cliPorts = portStatuses.filter((s) => s.available).map((s) => s.port);
+          process.stdout.write(`cli-ports ${cliPorts.join(',') || 'none'}\n`);
+          if (doctorError) {
+            process.stderr.write(`doctor-error ${doctorError}\n`);
+            return;
+          }
+          if (!doctorResult) {
+            process.stdout.write('doctor unavailable\n');
+            return;
+          }
+
+          const providerLabel = doctorResult.provider || providerOption || 'unknown';
+          process.stdout.write(`provider ${providerLabel}\n`);
+          const modes = Array.isArray(doctorResult.modes) ? doctorResult.modes : [];
+          for (const modeEntry of modes) {
+            const ready = modeEntry.ready === true || modeEntry.summary?.ready === true;
+            if (ready) {
+              process.stdout.write(`mode ${modeEntry.mode} ready\n`);
+              continue;
+            }
+
+            const blockers = Array.isArray(modeEntry.blockers)
+              ? modeEntry.blockers
+              : (Array.isArray(modeEntry.checks)
+                ? modeEntry.checks
+                  .filter((c) => c?.status === 'fail' && c?.id !== 'startup_readiness')
+                  .map((c) => c.detail || c.label || c.id)
+                : []);
+            process.stdout.write(`mode ${modeEntry.mode} not-ready ${blockers.length || 0}\n`);
+            for (const blocker of blockers) {
+              process.stdout.write(`blocker ${modeEntry.mode} ${String(blocker)}\n`);
+            }
+          }
           return;
         }
 
@@ -4266,6 +4358,8 @@ const commands = {
       updateSpin?.stop('Already up to date');
       if (showOutput) {
         clackOutro('no update needed');
+      } else if (isQuietMode(options)) {
+        process.stdout.write(`up-to-date ${currentVersion}\n`);
       }
       return;
     }
@@ -4335,6 +4429,8 @@ const commands = {
     }
     if (showOutput) {
       clackOutro('update complete');
+    } else if (isQuietMode(options)) {
+      process.stdout.write(`updated ${updateInfo.version || 'latest'}\n`);
     }
   },
 };
@@ -4440,12 +4536,30 @@ if (isCliExecution) {
   });
 
   process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    if (isJsonMode(activeCommandOptions)) {
+      printJson({
+        status: 'error',
+        error: {
+          message: `Unhandled rejection: ${String(reason)}`,
+        },
+      });
+    } else {
+      console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    }
     process.exit(1);
   });
 
   process.on('uncaughtException', (error) => {
-    console.error('Uncaught Exception:', error);
+    if (isJsonMode(activeCommandOptions)) {
+      printJson({
+        status: 'error',
+        error: {
+          message: `Uncaught exception: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      });
+    } else {
+      console.error('Uncaught Exception:', error);
+    }
     process.exit(1);
   });
 
