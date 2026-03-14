@@ -30,6 +30,26 @@ const isExecutableFile = (candidate) => {
   }
 };
 
+const normalizeGitExecutableCandidate = (candidate) => {
+  if (typeof candidate !== 'string') {
+    return null;
+  }
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const ext = path.extname(trimmed).toLowerCase();
+  if (ext === '.cmd' || ext === '.bat' || ext === '.com') {
+    const exeCandidate = trimmed.slice(0, -ext.length) + '.exe';
+    if (isExecutableFile(exeCandidate)) {
+      return exeCandidate;
+    }
+  }
+
+  return trimmed;
+};
+
 const resolveGitBinary = () => {
   if (process.platform !== 'win32') {
     return 'git';
@@ -49,15 +69,38 @@ const resolveGitBinary = () => {
   }
 
   try {
-    const result = spawnSync('where', ['git'], {
+    const resultExe = spawnSync('where', ['git.exe'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     });
-    if (result.status === 0) {
-      const matches = String(result.stdout || '')
+    if (resultExe.status === 0) {
+      const matches = String(resultExe.stdout || '')
         .split(/\r?\n/)
         .map((line) => line.trim())
+        .filter(Boolean)
+        .map(normalizeGitExecutableCandidate)
+        .filter(Boolean)
+        .filter((line) => isExecutableFile(line));
+      const preferredExe = matches.find((line) => line.toLowerCase().endsWith('.exe'));
+      const selected = preferredExe || matches[0];
+      if (selected) {
+        resolvedGitBinary = selected;
+        return resolvedGitBinary;
+      }
+    }
+
+    const resultAny = spawnSync('where', ['git'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    if (resultAny.status === 0) {
+      const matches = String(resultAny.stdout || '')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map(normalizeGitExecutableCandidate)
         .filter(Boolean)
         .filter((line) => isExecutableFile(line));
       const preferredExe = matches.find((line) => line.toLowerCase().endsWith('.exe'));

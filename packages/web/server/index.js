@@ -4066,20 +4066,59 @@ function resolveGitBinaryForSpawn() {
   }
 
   const candidates = [];
-  const pathCandidate = searchPathFor('git');
+  const normalizeGitCandidate = (candidate) => {
+    if (typeof candidate !== 'string') {
+      return '';
+    }
+    const trimmed = candidate.trim();
+    if (!trimmed) {
+      return '';
+    }
+    const ext = path.extname(trimmed).toLowerCase();
+    if (ext === '.cmd' || ext === '.bat' || ext === '.com') {
+      const exeCandidate = trimmed.slice(0, -ext.length) + '.exe';
+      if (isExecutable(exeCandidate)) {
+        return exeCandidate;
+      }
+    }
+    return trimmed;
+  };
+
+  const pathCandidate = normalizeGitCandidate(searchPathFor('git'));
   if (pathCandidate && isExecutable(pathCandidate)) {
     candidates.push(pathCandidate);
   }
 
+  const pathExeCandidate = normalizeGitCandidate(searchPathFor('git.exe'));
+  if (pathExeCandidate && isExecutable(pathExeCandidate)) {
+    candidates.push(pathExeCandidate);
+  }
+
   try {
-    const result = spawnSync('where', ['git'], {
+    const resultExe = spawnSync('where', ['git.exe'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     });
-    if (result.status === 0) {
-      const whereMatches = String(result.stdout || '')
+    if (resultExe.status === 0) {
+      const whereMatches = String(resultExe.stdout || '')
         .split(/\r?\n/)
+        .map((line) => normalizeGitCandidate(line))
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .filter((line) => isExecutable(line));
+      candidates.push(...whereMatches);
+    }
+
+    const resultAny = spawnSync('where', ['git'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    if (resultAny.status === 0) {
+      const whereMatches = String(resultAny.stdout || '')
+        .split(/\r?\n/)
+        .map((line) => normalizeGitCandidate(line))
         .map((line) => line.trim())
         .filter(Boolean)
         .filter((line) => isExecutable(line));
